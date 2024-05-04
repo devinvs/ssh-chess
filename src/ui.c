@@ -352,7 +352,7 @@ void draw_game_screen() {
     }
     
     print_input(row_off+21, center_col-30);
-    move_cursor(row_off+23, center_col-29);
+    move_cursor(row_off+23, center_col-29+input_i);
 
     fflush(0);
 }
