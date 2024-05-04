@@ -220,7 +220,7 @@ void hline(int row, int col, int len) {
     }
 }
 
-void draw() {
+void draw_game_screen() {
     char board[64] = {
         'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r',
         'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p',
@@ -254,14 +254,16 @@ void draw() {
         return;
     }
 
+    int row_off = (s.ws_row - 24) / 3;
+
     // board
-    print_board(board, false, 1, center_col-30);
-    vline(0, center_col+42-5-30, 20);
-    hline(20, 0, s.ws_col);
+    print_board(board, false, row_off+1, center_col-30);
+    vline(row_off+0, center_col+42-5-30, 20);
+    hline(row_off+20, center_col-40, 80);
 
     // usernames
     dim();
-    move_cursor(1, center_col+12);
+    move_cursor(row_off+1, center_col+12);
     printf("N00bSl4yer20 vs Dumbsavanta");
     reset();
 
@@ -273,38 +275,89 @@ void draw() {
         "to"
     };
 
-    draw_history(2, center_col+9, moves, 5, 0);
+    draw_history(row_off+2, center_col+9, moves, 5, 0);
 
     // move hint text
-    move_cursor(21, center_col-5);
+    move_cursor(row_off+21, center_col-5);
     dim();
     underline();
     printf("move formats");
     reset();
     dim();
-    move_cursor(22, center_col-5);
+    move_cursor(row_off+22, center_col-5);
     printf("coords:  d2d4");
-    move_cursor(23, center_col-5);
+    move_cursor(row_off+23, center_col-5);
     printf("algebra: Nxd7");
     reset();
 
     // command list text
-    move_cursor(21, center_col+17);
+    move_cursor(row_off+21, center_col+17);
     dim();
     underline();
     printf("   commands   ");
     reset();
     dim();
-    move_cursor(22, center_col+17);
+    move_cursor(row_off+22, center_col+17);
     printf("/draw  /resign");
-    move_cursor(23, center_col+17);
+    move_cursor(row_off+23, center_col+17);
     printf("/color /sound");
     reset();
+
+    // borders
+    // only print borders if row_off is greater than 1
+    if (row_off > 1 && s.ws_col > 90) {
+        //top line
+        move_cursor(row_off, center_col-41);
+        printf("┏");
+        for (int i=0; i<81; i++) {
+            printf("━");
+        }
+        printf("┓");
+
+        // bottom line
+        move_cursor(row_off+25, center_col-41);
+        printf("┗");
+        for (int i=0; i<81; i++) {
+            printf("━");
+        }
+        printf("┛");
+
+        // left line
+        for (int i=0; i<24; i++) {
+            move_cursor(row_off+1+i, center_col-41);
+            printf("┃");
+        }
+
+        // right line
+        for (int i=0; i<24; i++) {
+            move_cursor(row_off+1+i, center_col+41);
+            printf("┃");
+        }
+        
+        // bhline(row_off-1, center_col-40, 80);
+        // hline(row_off+26, center_col-40, 80);
+        // vline(row_off, center_col-40, 25);
+        // rvline(row_off, center_col+40, 25);
+    }
     
-    print_input(21, center_col-30);
-    move_cursor(23, center_col-29);
+    print_input(row_off+21, center_col-30);
+    move_cursor(row_off+23, center_col-29);
 
+    fflush(0);
+}
 
+void draw_login_screen() {
+    clear();
+    int center_col = s.ws_col / 2;
+    int center_row = s.ws_row / 2;
+
+    move_cursor(2, center_col-22);
+    printf(" __   __           __        ___  __   __  ");
+    move_cursor(3, center_col-22);
+    printf("/__` /__` |__|    /  ` |__| |__  /__` /__` ");
+    move_cursor(4, center_col-22);
+    printf(".__/ .__/ |  |    \\__, |  | |___ .__/ .__/ ");
+                                           
     fflush(0);
 }
 
@@ -318,7 +371,7 @@ void main() {
         if (size.ws_row != s.ws_row || size.ws_col != s.ws_col) {
             s.ws_row = size.ws_row;
             s.ws_col = size.ws_col;
-            draw();
+            draw_game_screen();
         }
 
         usleep(100000);
