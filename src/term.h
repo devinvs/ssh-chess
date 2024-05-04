@@ -9,3 +9,4 @@ void set_bg(int, int, int);
 void bg_moves();
 void dim();
 void fg_gray();
+void cursor_left();

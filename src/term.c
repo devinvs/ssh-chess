@@ -45,3 +45,7 @@ void move_cursor(int row, int col) {
 void dim() {
     printf("\x1b[2m");
 }
+
+void cursor_left() {
+    printf("\x1b[1D");
+}

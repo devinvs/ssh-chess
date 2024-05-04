@@ -2,6 +2,10 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <termios.h>
+#include <sys/select.h>
+#include <fcntl.h>
+#include <ctype.h>
 
 #include "term.h"
 
@@ -11,6 +15,10 @@
 #define PURPLE 147, 74, 190
 
 struct winsize s;
+
+static unsigned char input[21] = {0};
+static int input_i = 0;
+static int scroll = 0;
 
 void bg_board() {
     set_bg(130, 101, 195);
@@ -162,7 +170,7 @@ void print_board(char *board, bool flip, int row, int col) {
     printf("▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔");
 }
 
-void draw_history(int row, int col, char** moves, int n, int scroll) {
+void draw_history(int row, int col, char** moves, int n) {
     int init_row = row;
 
     int start;
@@ -200,7 +208,10 @@ void print_input(int row, int col) {
     move_cursor(row+1, col);
     printf("┏━━━━━━━━━━━━━━━━━━━━┓");
     move_cursor(row+2, col);
-    printf("┃                    ┃");
+    printf("┃");
+    printf("%s", input);
+    move_cursor(row+2, col+21);
+    printf("┃");
     move_cursor(row+3, col);
     printf("┗━━━━━━━━━━━━━━━━━━━━┛");
 
@@ -275,7 +286,7 @@ void draw_game_screen() {
         "to"
     };
 
-    draw_history(row_off+2, center_col+9, moves, 5, 0);
+    draw_history(row_off+2, center_col+9, moves, 5);
 
     // move hint text
     move_cursor(row_off+21, center_col-5);
@@ -362,6 +373,24 @@ void draw_login_screen() {
 }
 
 void main() {
+    struct termios ttystate, ttysave;
+    fd_set readset;
+
+    // get current attributes and save them
+    tcgetattr(STDIN_FILENO, &ttystate);
+    ttysave = ttystate;
+
+    //turn off canonical mode and echo
+    ttystate.c_lflag &= ~(ICANON | ECHO);
+    //minimum of number input read.
+    // ttystate.c_cc[VMIN] = 1;
+
+    //set the terminal attributes.
+    tcsetattr(STDIN_FILENO, TCSANOW, &ttystate);
+
+    // set stdin as nonblocking so we can just poll it when necessary
+    fcntl(0, F_SETFL, O_NONBLOCK);
+
     s.ws_row = 0;
     s.ws_col = 0;
 
@@ -374,6 +403,44 @@ void main() {
             draw_game_screen();
         }
 
-        usleep(100000);
+        // handle input (up to 32 inputs)
+        char buf[32] = {0};
+        size_t n = read(0, buf, 32);
+
+        if (n == -1)
+            goto sleep;
+
+        for (int i=0; i<n; i++) {
+            char c = buf[i];
+            if ((isalnum(c) || c=='/') && input_i < 20) {
+                input[input_i] = c;
+                input[input_i+1] = 0;
+                input_i++;
+
+                printf("%c", c);
+            } else if (c == 127 && input_i > 0) {
+                input_i--;
+                input[input_i] = 0;
+
+                cursor_left();
+                printf(" ");
+                cursor_left();
+            } else if (c == 27 && i+1<n && buf[i+1] == 91 && i+2<n) {
+                i+=2;
+                c = buf[i];
+
+                if (c == 'A') {
+                    scroll++;
+                } else {
+                    scroll--;
+                }
+            }
+        }
+        fflush(0);
+
+        sleep:
+        usleep(10000);
     }
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &ttysave);
 }
