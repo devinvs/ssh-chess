@@ -259,7 +259,7 @@ void draw_game_screen() {
     if (s.ws_col < 80) {
         move_cursor(center_row, center_col-9);
         printf("terminal too small");
-        move_cursor(center_row+1, center_col);
+        move_cursor(center_row+1, center_col-10);
         printf("resize to 80 columns");
         fflush(0);
         return;
