@@ -15,6 +15,6 @@ typedef struct {
 Move new_move(int from, int to, char piece);
 char check_line(char *board, int pos, int until, int dr, int dc, int* tpos);
 bool check_check(char *board, bool white);
-bool do_move(char *board, int from, int to, bool white, Move *out);
+char* do_move(char *board, int from, int to, bool white, Move *out);
 
 #endif

@@ -14,6 +14,10 @@ void fg_black() {
     printf("\x1b[30m");
 }
 
+void fg_red() {
+    printf("\x1b[31m");
+}
+
 void fg_white() {
     printf("\x1b[38;2;255;255;255m");
 }

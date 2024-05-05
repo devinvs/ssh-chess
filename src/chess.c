@@ -31,7 +31,10 @@ int signum(int a) {
 }
 
 bool case_eq(char a, char b) {
-    return a!=' ' && b!=' ' && !(a & b & 0x20);
+    if (a == ' ' || b == ' ')
+        return false;
+
+    return (islower(a) && islower(b)) || (isupper(a) && isupper(b));
 }
 
 
@@ -152,16 +155,20 @@ bool check_check(char *board, bool white) {
 //
 // returns false if invalid, the board is not changed
 // returns true if valid, changing the board and writing the move to out
-bool do_move(char *board, int from, int to, bool white, Move *out) {
-    // first check that the piece being moved is of our color
+char* do_move(char *board, int from, int to, bool white, Move *out) {
     char piece = board[from];
+    // check that we aren't moving a space
+    if (piece == ' ')
+        return "cannot move an empty space";
+
+    // check that the piece being moved is of our color
     if (!case_eq(piece, white? 'K' : 'k'))
-        return false;
+        return "cannot move enemy piece";
 
     // now check that the square we are moving to does not
     // contain a piece of our color
     if (case_eq(board[to], piece))
-        return false;
+        return "cannot capture friendly piece";
 
     *out = new_move(from, to, board[from]);
     piece = tolower(board[from]);
@@ -180,41 +187,41 @@ bool do_move(char *board, int from, int to, bool white, Move *out) {
 
             // check that the king and rook have not moved
             if (white && wking_moved)
-                return false;
+                return "cannot castle after king has moved";
 
             if (white && dr == 1 && wrrook_moved)
-                return false;
+                return "cannot castle after rook has moved";
 
             if (white && dr == -1 && wlrook_moved)
-                return false;
+                return "cannot castle after rook has moved";
 
             if (!white && bking_moved)
-                return false;
+                return "cannot castle after king has moved";
 
             if (!white && dr == 1 && brrook_moved)
-                return false;
+                return "cannot castle after rook has moved";
 
             if (!white && dr == -1 && blrook_moved)
-                return false;
+                return "cannot castle after rook has moved";
             
             
             // There are only 4 pairs of from/to values
             // for a castle. We check them here for the correct color
             if (white && from != 60)
-                return false;
+                return "invalid king move";
 
             if (!white && from != 4)
-                return false;
+                return "invalid king move";
 
             if (white && (to != 62 || to != 58))
-                return false;
+                return "invalid king move";
 
             if (!white && (to != 2 || to != 6))
-                return false;
+                return "invalid king move";
 
             // there cannot be anything in the way of the king to the rook
             if (check_line(board, from+dr, to, dr, to_col-from_col, NULL) != 0)
-                return false;
+                return "cannot move through piece";
 
             // the king cannot pass through a check to get there
             char board_copy[64];
@@ -227,7 +234,7 @@ bool do_move(char *board, int from, int to, bool white, Move *out) {
                 k_i++;
 
                 if (check_check(board, white))
-                    return false;
+                    return "cannot castle through a check";
             }
 
             // swap the rook
@@ -236,46 +243,46 @@ bool do_move(char *board, int from, int to, bool white, Move *out) {
 
             memcpy(last_board, board, 64);
             memcpy(board, board_copy, 64);
-            return true;
+            return NULL;
         }
     } else if (piece == 'r') {
         // a rook can only move horizontall or vertically
         if (from_row != to_row && from_col != to_col)
-            return false;
+            return "invalid rook move";
 
         // there can't be anything between this rook and its target
         if (check_line(board, from, to, to_row-from_row, to_col-from_col, NULL) != 0)
-            return false;
+            return "cannot move through piece";
     } else if (piece == 'b') {
         // a bishop can only move diagonally
         if (abs(from_row-to_row) != abs(from_col-to_col))
-            return false;
+            return "invalid bishop move";
 
         // there can't be anything between this bishop and its target
         if (check_line(board, from, to, to_row-from_row, to_col-from_col, NULL) != 0)
-            return false;
+            return "cannot move through piece";
     } else if (piece == 'n') {
         // a knight moves in an lshaped pattern. One delta must be 1, and the other 2
         int drow = abs(from_row-to_row);
         int dcol = abs(from_col-to_col);
 
         if (drow == 1 && dcol != 2)
-            return false;
+            return "invalid knight move";
 
         if (drow == 2 && dcol != 1)
-            return false;
+            return "invalid knight move";
 
         if (drow != 1 && drow != 2)
-            return false;
+            return "invalid knight move";
     } else if (piece == 'q') {
         // a queen can move horizontally or diagonally
         if (abs(from_row-to_row) != abs(from_col-to_col))
             if (from_row != to_row && from_col != to_col)
-                return false;
+                return "invalid queen move";
 
         // there can't be anything between this queen and its target
         if (check_line(board, from, to, to_row-from_row, to_col-from_col, NULL) != 0)
-            return false;
+            return "cannot move through piece";
     } else if (piece == 'p') {
         // a pawn must either move forward (optionally promoted),
         // take diagonally, or en-passant
@@ -285,14 +292,17 @@ bool do_move(char *board, int from, int to, bool white, Move *out) {
         if (diff == 16 && ((white && from_row==6) || (!white && from_row==1))) {
             // first move is allowed to move two squares. There cannot be anything
             // in front of us or where we are landing
-            if (board[to+8*dc] != ' ' || board[to] != ' ')
-                return false;
+            if (board[to+8*dc] != ' ')
+                return "cannot move through pieces";
+
+            if (board[to] != ' ')
+                return "pawn cannot capture vertically";
             
         } else if (diff == 8) {
             // this is moving forward one square
             // ensure that no piece is in front of it
             if (board[to] != ' ')
-                return false;
+                return "pawn cannot capture vertically";
 
             // check if this is promoted
             if (to_row == 0 || to_row==7) {
@@ -319,9 +329,9 @@ bool do_move(char *board, int from, int to, bool white, Move *out) {
             // with en-passant out of the way, just check for captures
             // we've also already checked that "to" is not our color
             if (board[to] == ' ')
-                return false;
+                return "pawn must capture diagonally";
         } else {
-            return false;
+            return "invalid pawn move";
         }
     }
 
@@ -349,7 +359,7 @@ bool do_move(char *board, int from, int to, bool white, Move *out) {
         board_copy[out->to] = out->promote;
     
     if (check_check(board_copy, white))
-        return false;
+        return "cannot leave king in check";
 
     // set whether the other king is in check
     out->check = check_check(board_copy, !white);
@@ -360,6 +370,6 @@ bool do_move(char *board, int from, int to, bool white, Move *out) {
     // copy back and return, this was a valid move
     memcpy(last_board, board, 64);
     memcpy(board, board_copy, 64);
-    return true;
+    return NULL;
 }
 

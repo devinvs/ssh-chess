@@ -10,3 +10,4 @@ void bg_moves();
 void dim();
 void fg_gray();
 void cursor_left();
+void fg_red();

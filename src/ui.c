@@ -19,13 +19,19 @@
 
 static bool white = true;
 
-// The current size of the window
+// some global variables for querying the size of the window
+// and other important ui anchor points
 static struct winsize s;
+int center_col;
+int center_row;
+int row_off;
 
+// global state of the ui input and scroll
 static unsigned char input[21] = {0};
 static int input_i = 0;
 static int scroll = 0;
 
+// TODO: this shouldn't be global
 static Game g;
 
 void bg_board() {
@@ -36,6 +42,17 @@ struct winsize window_size() {
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     return w;
+}
+
+void print_warning(char *msg) {
+    bold();
+    fg_red();
+    move_cursor(row_off+24, center_col-7);
+    printf("                                          ");
+    move_cursor(row_off+24, center_col-7);
+    printf(msg);
+    reset();
+    fflush(0);
 }
 
 void print_board(bool flip, int row, int col) {
@@ -217,7 +234,8 @@ void print_input(int row, int col) {
     printf("┏━━━━━━━━━━━━━━━━━━━━┓");
     move_cursor(row+2, col);
     printf("┃");
-    printf("%s", input);
+    if (input_i > 0)
+        printf("%s", input);
     move_cursor(row+2, col+21);
     printf("┃");
     move_cursor(row+3, col);
@@ -241,8 +259,6 @@ void hline(int row, int col, int len) {
 
 void draw_game_screen() {
     clear();
-    int center_col = s.ws_col / 2;
-    int center_row = s.ws_row / 2;
 
     if (s.ws_row < 24) {
         move_cursor(center_row, center_col-9);
@@ -262,7 +278,6 @@ void draw_game_screen() {
         return;
     }
 
-    int row_off = (s.ws_row - 24) / 3;
 
     // board
     print_board(false, row_off+1, center_col-30);
@@ -341,11 +356,6 @@ void draw_game_screen() {
             move_cursor(row_off+1+i, center_col+41);
             printf("┃");
         }
-        
-        // bhline(row_off-1, center_col-40, 80);
-        // hline(row_off+26, center_col-40, 80);
-        // vline(row_off, center_col-40, 25);
-        // rvline(row_off, center_col+40, 25);
     }
     
     print_input(row_off+21, center_col-30);
@@ -356,8 +366,6 @@ void draw_game_screen() {
 
 void draw_login_screen() {
     clear();
-    int center_col = s.ws_col / 2;
-    int center_row = s.ws_row / 2;
 
     move_cursor(2, center_col-22);
     printf(" __   __           __        ___  __   __  ");
@@ -399,6 +407,9 @@ void main() {
         if (size.ws_row != s.ws_row || size.ws_col != s.ws_col) {
             s.ws_row = size.ws_row;
             s.ws_col = size.ws_col;
+            center_col = s.ws_col / 2;
+            center_row = s.ws_row / 2;
+            row_off = (s.ws_row - 24) / 3;
             draw_game_screen();
         }
 
@@ -460,22 +471,23 @@ void main() {
                             from_row = 7 - from_row;
                             to_row = 7 - to_row;
 
-                            // char piece = g->board[from_row*8+from_col];
-                            // g->board[from_row*8+from_col] = ' ';
-                            // g->board[to_row*8+to_col] = piece;
                             int from = from_row*8+from_col;
                             int to = to_row*8+to_col;
                             Move out;
-                            bool bout = do_move(g->board, from, to, white, &out);
-                            if (bout)
+                            char* error = do_move(g->board, from, to, white, &out);
+                            if (error == NULL) {
                                 white = !white;
+                                draw_game_screen();
+                            } else {
+                                print_warning(error);
+                                move_cursor(row_off+23, center_col-29+input_i);
+                            }
                         }
                     }
                 }
 
                 // reset input to nothing
                 input[0] = 0;
-                draw_game_screen();
             }
         }
         fflush(0);
