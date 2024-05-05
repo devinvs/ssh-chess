@@ -6,19 +6,27 @@
 #include <sys/select.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <string.h>
 
 #include "term.h"
+#include "game.h"
+#include "chess.h"
 
 #define RED 186, 68, 76
 #define GREEN 95, 126, 50
 #define BLUE 55, 114, 190
 #define PURPLE 147, 74, 190
 
-struct winsize s;
+static bool white = true;
+
+// The current size of the window
+static struct winsize s;
 
 static unsigned char input[21] = {0};
 static int input_i = 0;
 static int scroll = 0;
+
+static Game g;
 
 void bg_board() {
     set_bg(130, 101, 195);
@@ -30,7 +38,7 @@ struct winsize window_size() {
     return w;
 }
 
-void print_board(char *board, bool flip, int row, int col) {
+void print_board(bool flip, int row, int col) {
     move_cursor(row, col);
     printf("▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁");
     row++;
@@ -64,7 +72,7 @@ void print_board(char *board, bool flip, int row, int col) {
                 c = 7-j;
             }
             
-            char out = board[r*8 + c];
+            char out = g->board[r*8 + c];
 
             switch (out) {
                 // white pieces
@@ -232,17 +240,6 @@ void hline(int row, int col, int len) {
 }
 
 void draw_game_screen() {
-    char board[64] = {
-        'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r',
-        'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p',
-        ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-        ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-        ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-        ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-        'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P',
-        'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R',
-    };
-
     clear();
     int center_col = s.ws_col / 2;
     int center_row = s.ws_row / 2;
@@ -268,7 +265,7 @@ void draw_game_screen() {
     int row_off = (s.ws_row - 24) / 3;
 
     // board
-    print_board(board, false, row_off+1, center_col-30);
+    print_board(false, row_off+1, center_col-30);
     vline(row_off+0, center_col+42-5-30, 20);
     hline(row_off+20, center_col-40, 80);
 
@@ -289,15 +286,15 @@ void draw_game_screen() {
     draw_history(row_off+2, center_col+9, moves, 5);
 
     // move hint text
-    move_cursor(row_off+21, center_col-5);
+    move_cursor(row_off+21, center_col-2);
     dim();
     underline();
     printf("move formats");
     reset();
     dim();
-    move_cursor(row_off+22, center_col-5);
+    move_cursor(row_off+22, center_col-2);
     printf("coords:  d2d4");
-    move_cursor(row_off+23, center_col-5);
+    move_cursor(row_off+23, center_col-2);
     printf("algebra: Nxd7");
     reset();
 
@@ -394,6 +391,8 @@ void main() {
     s.ws_row = 0;
     s.ws_col = 0;
 
+    g = new_game();
+
     while (1) {
         struct winsize size = window_size();
 
@@ -418,13 +417,18 @@ void main() {
                 input_i++;
 
                 printf("%c", c);
-            } else if (c == 127 && input_i > 0) {
-                input_i--;
-                input[input_i] = 0;
 
-                cursor_left();
+                if (input_i == 20)
+                    cursor_left();
+
+            } else if (c == 127 && input_i > 0) {
+                if (input_i != 20)
+                    cursor_left();
                 printf(" ");
                 cursor_left();
+
+                input_i--;
+                input[input_i] = 0;
             } else if (c == 27 && i+1<n && buf[i+1] == 91 && i+2<n) {
                 i+=2;
                 c = buf[i];
@@ -434,6 +438,44 @@ void main() {
                 } else {
                     scroll--;
                 }
+            } else if (c == 10) {
+                // clear the input on screen
+                while (input_i > 0) {
+                    if (input_i != 20)
+                        cursor_left();
+                    printf(" ");
+                    cursor_left();
+                    input_i--;
+                }
+
+                // parse the coords
+                if (strlen(input) == 4) {
+                    int from_col = tolower(input[0]) - 'a';
+                    int from_row = tolower(input[1]) - '0' - 1;
+                    int to_col = tolower(input[2]) - 'a';
+                    int to_row = tolower(input[3]) - '0' - 1;
+
+                    if (from_row >= 0 &&  from_col >= 0 && to_row >= 0 && to_col >= 0) {
+                        if (from_row < 8 && from_col < 8 && to_row < 8 && to_col < 8) {
+                            from_row = 7 - from_row;
+                            to_row = 7 - to_row;
+
+                            // char piece = g->board[from_row*8+from_col];
+                            // g->board[from_row*8+from_col] = ' ';
+                            // g->board[to_row*8+to_col] = piece;
+                            int from = from_row*8+from_col;
+                            int to = to_row*8+to_col;
+                            Move out;
+                            bool bout = do_move(g->board, from, to, white, &out);
+                            if (bout)
+                                white = !white;
+                        }
+                    }
+                }
+
+                // reset input to nothing
+                input[0] = 0;
+                draw_game_screen();
             }
         }
         fflush(0);
