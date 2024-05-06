@@ -290,15 +290,7 @@ void draw_game_screen() {
     printf("N00bSl4yer20 vs Dumbsavanta");
     reset();
 
-    char * moves[5] = {
-        "hello",
-        "world",
-        "i'm",
-        "here",
-        "to"
-    };
-
-    draw_history(row_off+2, center_col+9, moves, 5);
+    draw_history(row_off+2, center_col+9, g->moves, g->num_moves);
 
     // move hint text
     move_cursor(row_off+21, center_col-2);
@@ -477,6 +469,7 @@ void main() {
                             char* error = do_move(g->board, from, to, white, &out);
                             if (error == NULL) {
                                 white = !white;
+                                push_move(g, input);
                                 draw_game_screen();
                             } else {
                                 print_warning(error);
