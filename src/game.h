@@ -1,8 +1,10 @@
 #ifndef _GAME_H
 #define _GAME_H
 
+#include "chess.h"
+
 typedef struct game_s {
-    char **moves;
+    Move * moves;
     int num_moves;
     int cap_moves;
     char board[64];
@@ -10,6 +12,6 @@ typedef struct game_s {
 
 Game new_game(void);
 void free_game(Game);
-void push_move(Game, char*);
+void push_move(Game, Move);
 
 #endif

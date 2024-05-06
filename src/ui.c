@@ -195,7 +195,7 @@ void print_board(bool flip, int row, int col) {
     printf("▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔");
 }
 
-void draw_history(int row, int col, char** moves, int n) {
+void draw_history(int row, int col, Move* moves, int n) {
     int init_row = row;
 
     int start;
@@ -217,7 +217,18 @@ void draw_history(int row, int col, char** moves, int n) {
             move_cursor(row, col+21);
             row++;
         }
-        printf("%s", moves[start]);
+
+        // print out the move as coords for now
+        Move m = moves[start];
+        printf(
+            "%c%c%c%c",
+            m.from%8 + 'a',
+            7-m.from/8 + '1',
+            m.to%8 + 'a',
+            7-m.to/8 + '1'
+        );
+
+        
         white = !white;
     }
 
@@ -280,7 +291,7 @@ void draw_game_screen() {
 
 
     // board
-    print_board(false, row_off+1, center_col-30);
+    print_board(!white, row_off+1, center_col-30);
     vline(row_off+0, center_col+42-5-30, 20);
     hline(row_off+20, center_col-40, 80);
 
@@ -466,10 +477,15 @@ void main() {
                             int from = from_row*8+from_col;
                             int to = to_row*8+to_col;
                             Move out;
-                            char* error = do_move(g->board, from, to, white, &out);
+                            Move last;
+                            if (g->num_moves != 0)
+                                last = g->moves[g->num_moves-1];
+
+                            char* error = check_move(g->board, last, from, to, white, &out);
                             if (error == NULL) {
                                 white = !white;
-                                push_move(g, input);
+                                do_move(g->board, out);
+                                push_move(g, out);
                                 draw_game_screen();
                             } else {
                                 print_warning(error);

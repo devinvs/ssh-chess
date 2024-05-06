@@ -6,25 +6,15 @@
 #include <math.h>
 #include <stdio.h>
 
+#include "chess.h"
+#include "game.h"
+
 static bool wking_moved = true;
 static bool wlrook_moved = true;
 static bool wrrook_moved = true;
 static bool bking_moved = true;
 static bool blrook_moved = true;
 static bool brrook_moved = true;
-
-static char last_board[64];
-
-typedef struct {
-    int from;
-    int to;
-    char piece;
-    char promote;
-    int capture;
-    bool castle: 1;
-    bool check: 1;
-    bool checkmate: 1;
-} Move;
 
 int signum(int a) {
     if (a < 0) {return -1;} else if (a > 0) { return 1; } else { return 0; }
@@ -56,8 +46,12 @@ char check_line(char *board, int pos, int until, int dr, int dc, int* tpos) {
     int delta = signum(dc) + signum(dr)*8;
     char c;
 
-    while (pos >= 0 && pos < 64) {
+    while (true) {
         pos += delta;
+
+        if (pos < 0 || pos > 63)
+            break;
+        
         if (until == pos)
             break;
 
@@ -86,19 +80,19 @@ bool check_check(char *board, bool white) {
     for (int dr=-1; dr<=1; dr++) {
         for (int dc=-1; dc<=1; dc++) {
             if (dr == 0 && dc == 0)
-                break;
+                continue;
 
             // get the piece that lies on this line
             char piece = check_line(board, k_i, -1, dr, dc, &pos);
 
             // if it is zero no piece detected
             if (piece == 0)
-                break;
+                continue;
 
             // we can't be taken by one of our pieces
             // if the case is the same for both pieces, skip
             if (case_eq(king, piece))
-                break;
+                continue;
 
             // split out cases for linear and diagonal now
             if (abs(dr) == abs(dc)) {
@@ -107,7 +101,7 @@ bool check_check(char *board, bool white) {
                     // a pawn on the diagonal must be moving positive
                     // for black and negative for white
                     if (dr != (white? -1: 1))
-                        break;
+                        continue;
 
                     // a pawn on the diagonal must be only one space away
                     int delta = dc + dr*8;
@@ -136,13 +130,16 @@ bool check_check(char *board, bool white) {
         for (int dc=-2; dc<=2; dc++) {
             // only interested in pairs of 1s and 2s, skip otherwise
             if (abs(dr) == abs(dc) || dr==0 || dc==0)
-                break;
+                continue;
 
             // check the square for a knight of the opposite color
             char tknight = white? 'n': 'N';
-            int delta = dc + dr*8;
+            int to = pos + dc + dr*8;
 
-            if (board[pos+delta] == tknight)
+            if (to < 0 || to > 63)
+                continue;
+
+            if (board[to] == tknight)
                 return true;
         }
     }
@@ -151,11 +148,177 @@ bool check_check(char *board, bool white) {
     return false;
 }
 
-// do_move attempts to execute a move on the board
+bool check_checkmate(char *board, Move last, bool white) {
+    Move m;
+
+    // first find the position of the king
+    char king = white? 'K':'k';
+    int k_i = 0;
+    for (;k_i<64; k_i++)
+        if (board[k_i] == king)
+            break;
+
+    // check if the king moves to any of its spaces
+    // if it will still be in check
+    for (int i=-1; i<=1; i++) {
+        for (int j=-1; j<=1; j++) {
+            if (i == 0 && j == 0)
+                continue;
+
+            int to = k_i + i*8 + j;
+            if (to < 0 || to > 63)
+                continue;
+
+            char *err = check_move(board, last, k_i, to, white, &m);
+            // if we would be in check after this move it will return an error
+            if (err == NULL)
+                return false;
+        }
+    }
+
+    // we can't castle because we are in check
+
+    // for every other piece try every move (even invalid ones)
+    for (int i=0; i<63; i++) {
+        char piece = tolower(board[i]);
+
+        if (piece == ' ' || piece == 'k')
+            continue;
+
+        if (piece == 'p') {
+            // up two, up one, or up a diagonal
+            int dir = white ? -1 : 1;
+            if (check_move(board, last, i, i+16*dir, white, &m) == NULL)
+                return false;
+
+            if (check_move(board, last, i, i+7*dir, white, &m) == NULL)
+                return false;
+
+            if (check_move(board, last, i, i+8*dir, white, &m) == NULL)
+                return false;
+
+            if (check_move(board, last, i, i+9*dir, white, &m) == NULL)
+                return false;
+
+        } else if (piece == 'r') {
+            // check each direction
+            for (int to=i; i>=0 && i<=63; i+=8)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=8)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+            
+            for (int to=i; i>=0 && i<=63; i+=1)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=1)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+        } else if (piece == 'n') {
+            // Check each knight slot for threatening our king
+            for (int dr=-2; dr<=2; dr++) {
+                for (int dc=-2; dc<=2; dc++) {
+                    // only interested in pairs of 1s and 2s, skip otherwise
+                    if (abs(dr) == abs(dc) || dr==0 || dc==0)
+                        continue;
+
+                    // check the square for a knight of the opposite color
+                    int to = i + dc + dr*8;
+                    if (to < 0 || to > 63)
+                        continue;
+                    if (check_move(board, last, i, to, white, &m) == NULL)
+                        return false;
+                }
+            }
+
+        } else if (piece == 'b') {
+            for (int to=i; i>=0 && i<=63; i+=9)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=9)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+            
+            for (int to=i; i>=0 && i<=63; i+=7)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=7)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+        } else if (piece == 'q') {
+            // check each direction
+            for (int to=i; i>=0 && i<=63; i+=8)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=8)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+            
+            for (int to=i; i>=0 && i<=63; i+=1)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=1)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+            
+            for (int to=i; i>=0 && i<=63; i+=9)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=9)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+            
+            for (int to=i; i>=0 && i<=63; i+=7)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=i; i>=0 && i<=63; i-=7)
+                if (check_move(board, last, i, to, white, &m) == NULL)
+                    return false;
+        }
+    }
+
+    return true;
+}
+
+// actually execute a move on the board
+void do_move(char *board, Move m) {
+    if (m.capture)
+        board[m.capture] = ' ';
+
+    board[m.to] = board[m.from];
+    board[m.from] = ' ';
+
+    if (m.promote)
+        board[m.to] = m.promote;
+
+    if (m.castle) {
+        int from_row = m.from / 8;
+        int to_row = m.to / 8;
+        int dr = signum(to_row-from_row);
+        int k_i = m.to;
+
+        // swap the rook
+        int r_dr = dr < 0 ? -2 : 1;
+        board[k_i-dr] = board[k_i+r_dr];
+        board[k_i+r_dr] = ' ';
+    }
+}
+
+// check_move checks a move on the board
 //
-// returns false if invalid, the board is not changed
-// returns true if valid, changing the board and writing the move to out
-char* do_move(char *board, int from, int to, bool white, Move *out) {
+// returns NULL if valid
+// returns error message if invalid
+// writes the resulting move to *out
+char* check_move(char *board, Move last, int from, int to, bool white, Move *out) {
     char piece = board[from];
     // check that we aren't moving a space
     if (piece == ' ')
@@ -223,6 +386,8 @@ char* do_move(char *board, int from, int to, bool white, Move *out) {
             if (check_line(board, from+dr, to, dr, to_col-from_col, NULL) != 0)
                 return "cannot move through piece";
 
+            // TODO: the king cannoto currently be in check
+
             // the king cannot pass through a check to get there
             char board_copy[64];
             memcpy(board_copy, board, 64);
@@ -238,11 +403,10 @@ char* do_move(char *board, int from, int to, bool white, Move *out) {
             }
 
             // swap the rook
-            board_copy[k_i-dr] = board_copy[k_i+dr];
-            board_copy[k_i+dr] = ' ';
-
-            memcpy(last_board, board, 64);
-            memcpy(board, board_copy, 64);
+            int r_dr = dr < 0 ? -2 : 1;
+            board_copy[k_i-dr] = board_copy[k_i+r_dr];
+            board_copy[k_i+r_dr] = ' ';
+            
             return NULL;
         }
     } else if (piece == 'r') {
@@ -317,7 +481,7 @@ char* do_move(char *board, int from, int to, bool white, Move *out) {
             if ((white && from_row == 3) || (!white && from_row==4)) {
                 char enemy = white? 'p':'P';
                 if (board[to+8*dc] == enemy) {
-                    if (last_board[to+16*dc] == enemy) {
+                    if (last.to == (to+8*dc)) {
                         // this is a legal en-passant
                         out->capture = to+8*dc;
 
@@ -349,27 +513,16 @@ char* do_move(char *board, int from, int to, bool white, Move *out) {
 
     // do this move on a copy
     // ensure that we are not in check after this move.
-    if (out->capture)
-        board_copy[out->capture] = ' ';
-
-    board_copy[out->to] = board_copy[out->from];
-    board_copy[out->from] = ' ';
-
-    if (out->promote)
-        board_copy[out->to] = out->promote;
+    do_move(board_copy, *out);
     
     if (check_check(board_copy, white))
         return "cannot leave king in check";
 
     // set whether the other king is in check
     out->check = check_check(board_copy, !white);
-    // TODO
-    // if (out->check)
-        // out->checkmate = check_checkmate(board_copy, !white);
+    if (out->check)
+        out->checkmate = check_checkmate(board_copy, last, !white);
 
-    // copy back and return, this was a valid move
-    memcpy(last_board, board, 64);
-    memcpy(board, board_copy, 64);
     return NULL;
 }
 
