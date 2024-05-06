@@ -451,12 +451,12 @@ char* check_move(char *board, Move last, int from, int to, bool white, Move *out
         // a pawn must either move forward (optionally promoted),
         // take diagonally, or en-passant
         int diff = abs(to-from);
-        int dc = signum(to_col-from_col);
+        int dr = signum(to_row-from_row);
 
         if (diff == 16 && ((white && from_row==6) || (!white && from_row==1))) {
             // first move is allowed to move two squares. There cannot be anything
             // in front of us or where we are landing
-            if (board[to+8*dc] != ' ')
+            if (board[to+8*dr] != ' ')
                 return "cannot move through pieces";
 
             if (board[to] != ' ')
@@ -480,10 +480,10 @@ char* check_move(char *board, Move last, int from, int to, bool white, Move *out
             // home square two moves ago
             if ((white && from_row == 3) || (!white && from_row==4)) {
                 char enemy = white? 'p':'P';
-                if (board[to+8*dc] == enemy) {
-                    if (last.to == (to+8*dc)) {
+                if (board[to-8*dr] == enemy) {
+                    if (last.to == (to-8*dr)) {
                         // this is a legal en-passant
-                        out->capture = to+8*dc;
+                        out->capture = to-8*dr;
 
                         goto next;
                     }
