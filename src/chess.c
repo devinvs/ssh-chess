@@ -329,7 +329,7 @@ char* do_move(char *board, int from, int to, bool white, Move *out) {
             // with en-passant out of the way, just check for captures
             // we've also already checked that "to" is not our color
             if (board[to] == ' ')
-                return "pawn must capture diagonally";
+                return "invalid pawn move";
         } else {
             return "invalid pawn move";
         }
