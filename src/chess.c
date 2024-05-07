@@ -43,21 +43,28 @@ Move new_move(int from, int to, char piece) {
 }
 
 char check_line(char *board, int pos, int until, int dr, int dc, int* tpos) {
-    int delta = signum(dc) + signum(dr)*8;
+    int until_row = until / 8;
+    int until_col = until % 8;
+    int row = pos / 8;
+    int col = pos % 8;
+
+    dr = signum(dr);
+    dc = signum(dc);
     char c;
 
     while (true) {
-        pos += delta;
+        row += dr;
+        col += dc;
 
-        if (pos < 0 || pos > 63)
+        if (row > 7 || row < 0 || col > 7 || col < 0)
             break;
         
-        if (until == pos)
+        if (until_row == row && until_col == col)
             break;
 
-        if ((c=board[pos]) != ' ') {
+        if ((c=board[row*8+col]) != ' ') {
             if (tpos != NULL)
-                *tpos = pos;
+                *tpos = row*8+col;
             return c;
         }
     }
@@ -179,8 +186,8 @@ bool check_checkmate(char *board, Move last, bool white) {
     // we can't castle because we are in check
 
     // for every other piece try every move (even invalid ones)
-    for (int i=0; i<63; i++) {
-        char piece = tolower(board[i]);
+    for (int pi=0; pi<63; pi++) {
+        char piece = tolower(board[pi]);
 
         if (piece == ' ' || piece == 'k')
             continue;
@@ -188,34 +195,34 @@ bool check_checkmate(char *board, Move last, bool white) {
         if (piece == 'p') {
             // up two, up one, or up a diagonal
             int dir = white ? -1 : 1;
-            if (check_move(board, last, i, i+16*dir, white, &m) == NULL)
+            if (check_move(board, last, pi, pi+16*dir, white, &m) == NULL)
                 return false;
 
-            if (check_move(board, last, i, i+7*dir, white, &m) == NULL)
+            if (check_move(board, last, pi, pi+7*dir, white, &m) == NULL)
                 return false;
 
-            if (check_move(board, last, i, i+8*dir, white, &m) == NULL)
+            if (check_move(board, last, pi, pi+8*dir, white, &m) == NULL)
                 return false;
 
-            if (check_move(board, last, i, i+9*dir, white, &m) == NULL)
+            if (check_move(board, last, pi, pi+9*dir, white, &m) == NULL)
                 return false;
 
         } else if (piece == 'r') {
             // check each direction
-            for (int to=i; i>=0 && i<=63; i+=8)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to+=8)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
 
-            for (int to=i; i>=0 && i<=63; i-=8)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to-=8)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
             
-            for (int to=i; i>=0 && i<=63; i+=1)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to+=1)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
 
-            for (int to=i; i>=0 && i<=63; i-=1)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to-=1)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
         } else if (piece == 'n') {
             // Check each knight slot for threatening our king
@@ -226,62 +233,63 @@ bool check_checkmate(char *board, Move last, bool white) {
                         continue;
 
                     // check the square for a knight of the opposite color
-                    int to = i + dc + dr*8;
+                    int to = pi + dc + dr*8;
                     if (to < 0 || to > 63)
                         continue;
-                    if (check_move(board, last, i, to, white, &m) == NULL)
+                    if (check_move(board, last, pi, to, white, &m) == NULL)
                         return false;
                 }
             }
 
         } else if (piece == 'b') {
-            for (int to=i; i>=0 && i<=63; i+=9)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to+=9)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
 
-            for (int to=i; i>=0 && i<=63; i-=9)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to-=9)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
             
-            for (int to=i; i>=0 && i<=63; i+=7)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to+=7)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
 
-            for (int to=i; i>=0 && i<=63; i-=7)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to-=7)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
         } else if (piece == 'q') {
             // check each direction
-            for (int to=i; i>=0 && i<=63; i+=8)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to+=9)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
 
-            for (int to=i; i>=0 && i<=63; i-=8)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to-=9)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
             
-            for (int to=i; i>=0 && i<=63; i+=1)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to+=7)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
 
-            for (int to=i; i>=0 && i<=63; i-=1)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to-=7)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
+                    return false;
+
+            // check each direction
+            for (int to=pi; to>=0 && to<=63; to+=8)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
+                    return false;
+
+            for (int to=pi; to>=0 && to<=63; to-=8)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
             
-            for (int to=i; i>=0 && i<=63; i+=9)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to+=1)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
 
-            for (int to=i; i>=0 && i<=63; i-=9)
-                if (check_move(board, last, i, to, white, &m) == NULL)
-                    return false;
-            
-            for (int to=i; i>=0 && i<=63; i+=7)
-                if (check_move(board, last, i, to, white, &m) == NULL)
-                    return false;
-
-            for (int to=i; i>=0 && i<=63; i-=7)
-                if (check_move(board, last, i, to, white, &m) == NULL)
+            for (int to=pi; to>=0 && to<=63; to-=1)
+                if (check_move(board, last, pi, to, white, &m) == NULL)
                     return false;
         }
     }
@@ -456,7 +464,7 @@ char* check_move(char *board, Move last, int from, int to, bool white, Move *out
         if (diff == 16 && ((white && from_row==6) || (!white && from_row==1))) {
             // first move is allowed to move two squares. There cannot be anything
             // in front of us or where we are landing
-            if (board[to+8*dr] != ' ')
+            if (board[to-8*dr] != ' ')
                 return "cannot move through pieces";
 
             if (board[to] != ' ')

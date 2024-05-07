@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "term.h"
 #include "game.h"
@@ -487,6 +488,12 @@ void main() {
                                 do_move(g->board, out);
                                 push_move(g, out);
                                 draw_game_screen();
+
+                                if (out.checkmate) {
+                                    print_warning("You Win!");
+                                    usleep(100000 * 5);
+                                    goto end;
+                                }
                             } else {
                                 print_warning(error);
                                 move_cursor(row_off+23, center_col-29+input_i);
@@ -504,6 +511,8 @@ void main() {
         sleep:
         usleep(10000);
     }
+
+    end:
 
     tcsetattr(STDIN_FILENO, TCSANOW, &ttysave);
 }
