@@ -3,5 +3,5 @@ SRC=$(wildcard src/*.c)
 
 .PHONY: all
 all: $(SRC)
-	gcc -ggdb -o chess $^
+	gcc -Wall -ggdb -o chess $^
 

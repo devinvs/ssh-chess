@@ -28,7 +28,7 @@ int center_row;
 int row_off;
 
 // global state of the ui input and scroll
-static unsigned char input[21] = {0};
+static char input[21] = {0};
 static int input_i = 0;
 static int scroll = 0;
 
@@ -51,7 +51,7 @@ void print_warning(char *msg) {
     move_cursor(row_off+24, center_col-7);
     printf("                                          ");
     move_cursor(row_off+24, center_col-7);
-    printf(msg);
+    printf("%s", msg);
     reset();
     fflush(0);
 }
@@ -235,7 +235,7 @@ void draw_history(int row, int col, Move* moves, int n) {
 
     dim();
     move_cursor(init_row+17, col+8);
-    printf("🞁/🞃 to scroll");
+    printf("up/down to scroll");
     reset();
 }
 
@@ -381,9 +381,8 @@ void draw_login_screen() {
     fflush(0);
 }
 
-void main() {
+int main() {
     struct termios ttystate, ttysave;
-    fd_set readset;
 
     // get current attributes and save them
     tcgetattr(STDIN_FILENO, &ttystate);
